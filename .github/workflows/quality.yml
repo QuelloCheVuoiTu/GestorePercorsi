@@ -68,11 +68,15 @@ jobs:
         run: |
           npm ci 2>/dev/null || npm install 2>/dev/null || echo "No package.json found"
 
-      - name: 📊 Run SonarCloud Scan
+      - name: 📊 SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=QuelloCheVuoiTu_GestorePercorsi
+            -Dsonar.organization=QuelloCheVuoiTu
 
   # 🔬 3. CODEQL ADVANCED SECURITY (Nativo GitHub)
   codeql-analysis:
