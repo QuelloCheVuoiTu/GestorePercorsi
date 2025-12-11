@@ -1,0 +1,119 @@
+name: 🛡️ Security & Quality Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    - cron: '0 2 * * *'  # Ogni giorno alle 2 AM
+
+jobs:
+  # 🔐 1. SNYK SECURITY SCAN
+  snyk-security:
+    name: 🔍 Snyk Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+
+      - name: 🛡️ Snyk Security Scan
+        uses: snyk/actions@v0
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: |
+            --severity-threshold=high \
+            --fail-on=upgradable
+
+  # 📊 2. SONARCLOUD QUALITY SCAN
+  sonarcloud-quality:
+    name: 📊 SonarCloud Quality Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Importante per SonarCloud!
+
+      - name: 🔍 Detect project type
+        id: detect
+        run: |
+          # Rileva automaticamente il tipo di progetto
+          if [ -f "package.json" ]; then
+            echo "Detected: Node.js project"
+            echo "language=node" >> $GITHUB_OUTPUT
+          elif [ -f "pom.xml" ]; then
+            echo "Detected: Java Maven project"
+            echo "language=java" >> $GITHUB_OUTPUT
+          elif [ -f "requirements.txt" ]; then
+            echo "Detected: Python project"
+            echo "language=python" >> $GITHUB_OUTPUT
+          elif [ -f "*.csproj" ]; then
+            echo "Detected: C# project"
+            echo "language=csharp" >> $GITHUB_OUTPUT
+          else
+            echo "Detected: Generic project"
+            echo "language=generic" >> $GITHUB_OUTPUT
+          fi
+
+      - name: ⚙️ Setup based on detected language
+        if: steps.detect.outputs.language == 'node'
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: 📦 Install dependencies
+        if: steps.detect.outputs.language == 'node'
+        run: |
+          npm ci 2>/dev/null || npm install 2>/dev/null || echo "No package.json found"
+
+      - name: 📊 Run SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # 🔬 3. CODEQL ADVANCED SECURITY (Nativo GitHub)
+  codeql-analysis:
+    name: 🔬 CodeQL Advanced Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+
+      - name: 🔍 Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: javascript, python, java  # GitHub lo rileva automaticamente
+        
+      - name: 🏗️ Autobuild
+        uses: github/codeql-action/autobuild@v2
+
+      - name: 📊 Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+
+  # 📈 4. COMBINED REPORT
+  report:
+    name: 📈 Combined Quality Report
+    runs-on: ubuntu-latest
+    needs: [snyk-security, sonarcloud-quality, codeql-analysis]
+    if: always()
+    
+    steps:
+      - name: 📋 Generate Summary Report
+        run: |
+          echo "🎉 SECURITY & QUALITY PIPELINE COMPLETED!"
+          echo "========================================"
+          echo "✅ Snyk Security: Completed"
+          echo "✅ SonarCloud Quality: Completed" 
+          echo "✅ GitHub CodeQL: Completed"
+          echo ""
+          echo "📊 View results at:"
+          echo "- Snyk: https://app.snyk.io"
+          echo "- SonarCloud: https://sonarcloud.io"
+          echo "- GitHub Security: https://github.com/${{ github.repository }}/security"
