@@ -119,5 +119,5 @@ jobs:
           echo ""
           echo "📊 View results at:"
           echo "- Snyk: https://app.snyk.io"
-          echo "- SonarCloud: https://sonarcloud.io"
+          echo "• SonarCloud: https://sonarcloud.io/project/overview?id=QuelloCheVuoiTu_GestorePercorsi"
           echo "- GitHub Security: https://github.com/${{ github.repository }}/security"
