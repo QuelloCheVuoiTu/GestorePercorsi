@@ -15,10 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: 🛡️ Snyk Security Scan
-        uses: snyk/actions@v0
+        uses: snyk/actions@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
@@ -32,14 +32,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Importante per SonarCloud!
+          fetch-depth: 0  # Importante per l'analisi accurata di SonarCloud
 
       - name: 🔍 Detect project type
         id: detect
         run: |
-          # Rileva automaticamente il tipo di progetto
           if [ -f "package.json" ]; then
             echo "Detected: Node.js project"
             echo "language=node" >> $GITHUB_OUTPUT
@@ -57,19 +56,34 @@ jobs:
             echo "language=generic" >> $GITHUB_OUTPUT
           fi
 
-      - name: ⚙️ Setup based on detected language
+      # --- SETUP NODE (Se rilevato) ---
+      - name: ⚙️ Setup Node.js
         if: steps.detect.outputs.language == 'node'
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      - name: 📦 Install dependencies
+      - name: 📦 Install Node dependencies
         if: steps.detect.outputs.language == 'node'
         run: |
           npm ci 2>/dev/null || npm install 2>/dev/null || echo "No package.json found"
 
+      # --- SETUP JAVA (Se rilevato - CRITICO PER IL FIX) ---
+      - name: ⚙️ Setup Java
+        if: steps.detect.outputs.language == 'java'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17' # Puoi cambiare in '11' o '21' se necessario
+
+      - name: 📦 Build with Maven
+        if: steps.detect.outputs.language == 'java'
+        # Compila il codice per generare i binari in target/classes
+        run: mvn clean package -DskipTests
+
+      # --- SONAR SCAN ---
       - name: 📊 SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+        uses: SonarSource/sonarqube-scan-action@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -83,23 +97,24 @@ jobs:
     name: 🔬 CodeQL Advanced Analysis
     runs-on: ubuntu-latest
     permissions:
-      security-events: write
-      actions: read
+      contents: read          # <--- FIX: Necessario per scaricare il codice
+      security-events: write  # Necessario per caricare i risultati
+      actions: read           # Necessario per le dipendenze private (opzionale ma utile)
       
     steps:
       - name: 📥 Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: 🔍 Initialize CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v3
         with:
-          languages: javascript, python, java  # GitHub lo rileva automaticamente
+          languages: javascript, python, java 
         
       - name: 🏗️ Autobuild
-        uses: github/codeql-action/autobuild@v2
+        uses: github/codeql-action/autobuild@v3
 
       - name: 📊 Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v3
 
   # 📈 4. COMBINED REPORT
   report:
