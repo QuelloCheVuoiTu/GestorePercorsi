@@ -6,13 +6,15 @@ on:
   pull_request:
     branches: [ main, master ]
   schedule:
-    - cron: '0 2 * * *'  # Ogni giorno alle 2 AM
+    - cron: '0 2 * * *'
 
 jobs:
   # 🔐 1. SNYK SECURITY SCAN
   snyk-security:
     name: 🔍 Snyk Security Scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
@@ -22,9 +24,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          args: |
-            --severity-threshold=high \
-            --fail-on=upgradable
+          args: --severity-threshold=high --fail-on=upgradable
 
   # 📊 2. SONARCLOUD QUALITY SCAN
   sonarcloud-quality:
@@ -34,56 +34,46 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Importante per l'analisi accurata di SonarCloud
+          fetch-depth: 0  # Importante per la history di Sonar
 
       - name: 🔍 Detect project type
         id: detect
         run: |
           if [ -f "package.json" ]; then
-            echo "Detected: Node.js project"
             echo "language=node" >> $GITHUB_OUTPUT
           elif [ -f "pom.xml" ]; then
-            echo "Detected: Java Maven project"
             echo "language=java" >> $GITHUB_OUTPUT
-          elif [ -f "requirements.txt" ]; then
-            echo "Detected: Python project"
-            echo "language=python" >> $GITHUB_OUTPUT
-          elif [ -f "*.csproj" ]; then
-            echo "Detected: C# project"
-            echo "language=csharp" >> $GITHUB_OUTPUT
           else
-            echo "Detected: Generic project"
             echo "language=generic" >> $GITHUB_OUTPUT
           fi
 
-      # --- SETUP NODE (Se rilevato) ---
-      - name: ⚙️ Setup Node.js
-        if: steps.detect.outputs.language == 'node'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: 📦 Install Node dependencies
-        if: steps.detect.outputs.language == 'node'
-        run: |
-          npm ci 2>/dev/null || npm install 2>/dev/null || echo "No package.json found"
-
-      # --- SETUP JAVA (Se rilevato - CRITICO PER IL FIX) ---
+      # --- SETUP JAVA E COMPILAZIONE (Risolve Exit Code 3) ---
       - name: ⚙️ Setup Java
         if: steps.detect.outputs.language == 'java'
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17' # Puoi cambiare in '11' o '21' se necessario
+          java-version: '17' # Usa la versione Java del tuo progetto (11, 17, 21)
 
       - name: 📦 Build with Maven
         if: steps.detect.outputs.language == 'java'
-        # Compila il codice per generare i binari in target/classes
+        # Questo comando crea la cartella 'target/classes' richiesta da Sonar
         run: mvn clean package -DskipTests
 
-      # --- SONAR SCAN ---
+      # --- SETUP NODE (Solo se serve) ---
+      - name: ⚙️ Setup Node.js
+        if: steps.detect.outputs.language == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: 📦 Install Node dependencies
+        if: steps.detect.outputs.language == 'node'
+        run: npm ci 2>/dev/null || npm install 2>/dev/null
+
+      # --- SONAR SCAN (Risolve Warning Action Deprecata) ---
       - name: 📊 SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v4
+        uses: SonarSource/sonarqube-scan-action@v5 # Aggiornato alla v5/v6 come richiesto
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -92,14 +82,14 @@ jobs:
             -Dsonar.projectKey=QuelloCheVuoiTu_GestorePercorsi
             -Dsonar.organization=QuelloCheVuoiTu
 
-  # 🔬 3. CODEQL ADVANCED SECURITY (Nativo GitHub)
+  # 🔬 3. CODEQL ADVANCED SECURITY
   codeql-analysis:
     name: 🔬 CodeQL Advanced Analysis
     runs-on: ubuntu-latest
     permissions:
-      contents: read          # <--- FIX: Necessario per scaricare il codice
-      security-events: write  # Necessario per caricare i risultati
-      actions: read           # Necessario per le dipendenze private (opzionale ma utile)
+      contents: read          # Risolve errore "Repository not found"
+      security-events: write  # Permette di salvare i report
+      actions: read
       
     steps:
       - name: 📥 Checkout code
@@ -116,23 +106,12 @@ jobs:
       - name: 📊 Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
 
-  # 📈 4. COMBINED REPORT
+  # 📈 4. REPORT FINALE
   report:
     name: 📈 Combined Quality Report
     runs-on: ubuntu-latest
     needs: [snyk-security, sonarcloud-quality, codeql-analysis]
     if: always()
-    
     steps:
-      - name: 📋 Generate Summary Report
-        run: |
-          echo "🎉 SECURITY & QUALITY PIPELINE COMPLETED!"
-          echo "========================================"
-          echo "✅ Snyk Security: Completed"
-          echo "✅ SonarCloud Quality: Completed" 
-          echo "✅ GitHub CodeQL: Completed"
-          echo ""
-          echo "📊 View results at:"
-          echo "- Snyk: https://app.snyk.io"
-          echo "• SonarCloud: https://sonarcloud.io/project/overview?id=QuelloCheVuoiTu_GestorePercorsi"
-          echo "- GitHub Security: https://github.com/${{ github.repository }}/security"
+      - name: 📋 Summary
+        run: echo "Analisi completata. Controlla la tab Security o SonarCloud per i dettagli."
