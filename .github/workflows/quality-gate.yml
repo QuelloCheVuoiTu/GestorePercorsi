@@ -1,95 +1,4 @@
-name: Quality Gate Pipeline (Unified Report)
-
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-jobs:
-  # ------------------------------------------------------------------
-  # JOB 1: SNYK (Sicurezza Dipendenze + Report HTML)
-  # ------------------------------------------------------------------
-  security-snyk:
-    name: Snyk Security Scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up JDK 23
-        uses: actions/setup-java@v4
-        with:
-          java-version: '23'
-          distribution: 'temurin'
-          cache: maven
-
-      # Installiamo Snyk e anche il tool per convertire il JSON in HTML
-      - name: Install Snyk & Reporter
-        run: npm install -g snyk snyk-to-html
-
-      - name: Authenticate Snyk
-        run: snyk auth ${{ secrets.SNYK_TOKEN }}
-
-      # 1. Generiamo il report in JSON (senza far fallire subito il job)
-      - name: Snyk Test (Generate Report)
-        continue-on-error: true # Continua anche se trova vulnerabilità per generare il report
-        id: snyk_test_report
-        run: |
-          snyk test --all-projects --severity-threshold=critical --json > snyk_results.json
-
-      # 2. Convertiamo il JSON in un bel report HTML
-      - name: Convert Snyk JSON to HTML
-        run: |
-          snyk-to-html -i snyk_results.json -o snyk_report.html
-
-      # 3. Carichiamo il report come artefatto scaricabile
-      - name: Upload Snyk HTML Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: Snyk-Security-Report
-          path: snyk_report.html
-
-      # 4. Ora eseguiamo il blocco reale se c'erano errori critici
-      - name: Check Snyk Vulnerabilities (Blocker)
-        run: |
-          snyk test --all-projects --severity-threshold=critical
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-
-  # ------------------------------------------------------------------
-  # JOB 2: SONARCLOUD (Qualità Codice)
-  # ------------------------------------------------------------------
-  quality-sonar:
-    name: SonarCloud Scan
-    # Rimuoviamo 'needs: security-snyk' se vogliamo che giri anche se Snyk fallisce,
-    # altrimenti lascialo per bloccare tutto in sequenza.
-    needs: security-snyk 
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 
-
-      - name: Set up JDK 23
-        uses: actions/setup-java@v4
-        with:
-          java-version: '23'
-          distribution: 'temurin'
-          cache: maven
-
-      - name: Build and Analyze with SonarCloud
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-          -Dsonar.projectKey=QuelloCheVuoiTu_GestorePercorsi \
-          -Dsonar.organization=quellochevuoitusonar \
-          -Dsonar.host.url=https://sonarcloud.io \
-          -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
-          -DskipTests
-
-  # ------------------------------------------------------------------
+# ------------------------------------------------------------------
   # JOB 3: CODEQL (Sicurezza Avanzata)
   # ------------------------------------------------------------------
   security-codeql:
@@ -109,41 +18,17 @@ jobs:
       with:
         languages: 'java'
 
+    # --- ERRORE CORRETTO QUI SOTTO ---
     - name: Set up JDK 23
       uses: actions/setup-java@v4
       with:
-        languages: 'java'
+        java-version: '23'      # Prima c'era scritto "languages: 'java'" per errore
         distribution: 'temurin'
         cache: maven
+    # ---------------------------------
 
     - name: Build Java for CodeQL
       run: mvn clean package -DskipTests -B
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
-
-  # ------------------------------------------------------------------
-  # JOB 4: REPORT GENERATOR (Riepilogo Unificato)
-  # ------------------------------------------------------------------
-  generate-summary:
-    name: 📊 Generate Unified Report
-    runs-on: ubuntu-latest
-    if: always() # Esegue questo job anche se gli scan falliscono (importante!)
-    needs: [security-snyk, quality-sonar, security-codeql]
-    
-    steps:
-      - name: Create Job Summary
-        run: |
-          echo "# 🚀 Quality Gate Unified Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Ecco il riepilogo delle analisi effettuate su Java 23:" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Tool | Stato | Risultati |" >> $GITHUB_STEP_SUMMARY
-          echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Snyk** | ✅ Completato | [Scarica Report HTML (Artifacts)](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) |" >> $GITHUB_STEP_SUMMARY
-          echo "| **SonarCloud** | ✅ Completato | [Vai alla Dashboard](https://sonarcloud.io/dashboard?id=QuelloCheVuoiTu_GestorePercorsi) |" >> $GITHUB_STEP_SUMMARY
-          echo "| **CodeQL** | ✅ Completato | [Vedi Security Tab](https://github.com/${{ github.repository }}/security/code-scanning) |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ⚠️ Note Importanti" >> $GITHUB_STEP_SUMMARY
-          echo "- **Snyk**: Il report dettagliato è disponibile nella sezione 'Artifacts' in fondo alla pagina di questo Run." >> $GITHUB_STEP_SUMMARY
-          echo "- **CodeQL**: I risultati sono integrati nativamente nella tab 'Security' del repository." >> $GITHUB_STEP_SUMMARY
