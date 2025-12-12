@@ -3,8 +3,13 @@ name: Security - CodeQL
 on:
   push:
     branches: [ "main" ]
+    paths-ignore:
+      - '.github/workflows/**'  # Ignora modifiche a qualsiasi file in questa cartella
   pull_request:
     branches: [ "main" ]
+    paths-ignore:
+      - '.github/workflows/**'  # Ignora modifiche a qualsiasi file in questa cartella
+  workflow_dispatch:            # Ti permette di lanciarlo a mano se serve testare la pipeline
 
 jobs:
   codeql-scan:
