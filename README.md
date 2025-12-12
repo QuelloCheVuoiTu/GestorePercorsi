@@ -1,5 +1,5 @@
 # Gestore Percorsi
-Servizio per la gestione dei percorsi
+Servizio per la gestione dei percorsi.
 
 ## Indice
 | Sezione                                        | Descrizione                                                               |
