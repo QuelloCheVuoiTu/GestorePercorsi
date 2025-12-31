@@ -20,27 +20,38 @@ jobs:
       has-languages: ${{ steps.set-matrix.outputs.has-languages }}
     steps:
       - uses: actions/checkout@v4
-      - name: 🕵️ Detect Languages
+
+      - name: 🕵️ Dynamic Language Detection
         id: set-matrix
         shell: python
         run: |
           import os
           import json
+
           mapping = {
-              '.py': 'python', '.js': 'javascript', '.ts': 'javascript', '.jsx': 'javascript', '.tsx': 'javascript',
-              '.java': 'java', '.go': 'go', '.rb': 'ruby', '.cs': 'csharp', '.cpp': 'cpp', '.c': 'cpp', '.h': 'cpp', '.swift': 'swift'
+              '.py': 'python', '.js': 'javascript', '.ts': 'javascript', 
+              '.jsx': 'javascript', '.tsx': 'javascript', '.java': 'java', 
+              '.go': 'go', '.rb': 'ruby', '.cs': 'csharp', 
+              '.cpp': 'cpp', '.c': 'cpp', '.h': 'cpp', '.swift': 'swift'
           }
+
           found_langs = set()
+          ignored_dirs = {'.git', '.github', 'node_modules', 'dist', 'build', 'target', 'venv', 'bin', 'obj', '.idea', '.vscode'}
+
           for root, dirs, files in os.walk('.'):
-              dirs[:] = [d for d in dirs if d not in ['.git', '.github', 'node_modules', 'dist', 'build', 'venv']]
+              dirs[:] = [d for d in dirs if d not in ignored_dirs]
               for file in files:
                   ext = os.path.splitext(file)[1].lower()
                   if ext in mapping:
                       found_langs.add(mapping[ext])
+
           langs_list = list(found_langs)
-          print(f"Found languages: {langs_list}")
+          print(f"Detected languages: {langs_list}")
+
           has_langs = 'true' if langs_list else 'false'
-          if not langs_list: langs_list = ['none']
+          if not langs_list:
+              langs_list = ['none'] 
+
           with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
               fh.write(f"languages={json.dumps(langs_list)}\n")
               fh.write(f"has-languages={has_langs}\n")
@@ -48,7 +59,7 @@ jobs:
   analyze:
     needs: check-languages
     if: needs.check-languages.outputs.has-languages == 'true'
-    name: CodeQL (${{ matrix.language }})
+    name: CodeQL Analysis
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -60,8 +71,16 @@ jobs:
         language: ${{ fromJson(needs.check-languages.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
-        with: { languages: ${{ matrix.language }} }
-      - uses: github/codeql-action/autobuild@v3
-      - uses: github/codeql-action/analyze@v3
-        with: { category: "/language:${{matrix.language}}" }
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Attempt Auto-Build
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
