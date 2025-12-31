@@ -14,7 +14,7 @@ on:
 
 jobs:
   snyk-scan:
-    name: Snyk Vulnerability Scan
+    name: Snyk Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,18 +28,19 @@ jobs:
         run: snyk auth ${{ secrets.SNYK_TOKEN }}
 
       - name: Run Snyk Test
-        continue-on-error: true # Continua per generare il report HTML
         run: |
-          # Scansiona tutti i progetti rilevati con soglia medium
-          snyk test --all-projects --severity-threshold=medium --json > snyk_report.json || true
+          echo "Threshold: medium"
+          snyk test --all-projects --severity-threshold=medium --json > snyk_report.json
 
-          # Genera HTML report
-          snyk-to-html -i snyk_report.json -o snyk_report.html
+      - name: Generate Report
+        if: always()
+        run: snyk-to-html -i snyk_report.json -o snyk_report.html
 
-      - name: Snyk Monitor (Dashboard)
-        continue-on-error: true
+      - name: Snyk Monitor
+        if: always()
         run: snyk monitor --all-projects || true
 
       - name: Upload Report
         uses: actions/upload-artifact@v4
+        if: always()
         with: { name: snyk-security-report, path: snyk_report.html }

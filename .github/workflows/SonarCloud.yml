@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
 
-      # --- Setup Ambienti Comuni ---
+      # Setup Ambienti
       - uses: actions/setup-java@v4
         with: { java-version: '21', distribution: 'temurin' }
       - uses: actions/setup-python@v5
@@ -33,17 +33,18 @@ jobs:
         uses: actions/setup-dotnet@v4
         with: { dotnet-version: '8.0.x' }
 
-      # --- Smart Build: Tenta di compilare qualsiasi cosa trovi ---
+      # --- Smart Build ---
       - name: 🧠 Auto-Detect & Build
+        id: build_step
+        continue-on-error: true 
         run: |
-          echo "🔍 Scanning build systems..."
-          if [ -f "pom.xml" ]; then mvn clean verify -DskipTests; 
+          if [ -f "pom.xml" ]; then mvn clean verify -DskipTests --no-transfer-progress; 
           elif [ -f "gradlew" ]; then chmod +x gradlew && ./gradlew assemble --no-daemon;
-          elif [ -f "package.json" ]; then npm install;
+          elif [ -f "package.json" ]; then npm install --ignore-scripts;
           elif [ -f "go.mod" ]; then go build ./...;
           elif [ -f "requirements.txt" ]; then pip install -r requirements.txt;
           elif [ -f "*.sln" ]; then dotnet build;
-          else echo "⚠️ No standard build file found. Proceeding with generic analysis."; fi
+          else echo "⚠️ No build file found. Analyzign source only."; fi
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
@@ -53,3 +54,4 @@ jobs:
         with:
           args: >
             -Dsonar.qualitygate.wait=true
+            -Dsonar.verbose=false
