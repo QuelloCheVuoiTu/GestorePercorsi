@@ -28,8 +28,11 @@ jobs:
         run: snyk auth ${{ secrets.SNYK_TOKEN }}
 
       - name: Run Snyk Test
+        # Se 'true', la pipeline diventa verde anche se trova virus.
+        # Se 'false', la pipeline diventa ROSSA e blocca le PR.
+        continue-on-error: false
         run: |
-          echo "Threshold: medium"
+          echo "Running Snyk (Threshold: medium)"
           snyk test --all-projects --severity-threshold=medium --json > snyk_report.json
 
       - name: Generate Report

@@ -19,8 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-
-      # Setup Ambienti
       - uses: actions/setup-java@v4
         with: { java-version: '21', distribution: 'temurin' }
       - uses: actions/setup-python@v5
@@ -29,13 +27,10 @@ jobs:
         with: { node-version: '20' }
       - uses: actions/setup-go@v5
         with: { go-version: '1.21' }
-      - name: Setup Dotnet
-        uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v4
         with: { dotnet-version: '8.0.x' }
 
-      # --- Smart Build ---
       - name: 🧠 Auto-Detect & Build
-        id: build_step
         continue-on-error: true 
         run: |
           if [ -f "pom.xml" ]; then mvn clean verify -DskipTests --no-transfer-progress; 
@@ -44,7 +39,7 @@ jobs:
           elif [ -f "go.mod" ]; then go build ./...;
           elif [ -f "requirements.txt" ]; then pip install -r requirements.txt;
           elif [ -f "*.sln" ]; then dotnet build;
-          else echo "⚠️ No build file found. Analyzign source only."; fi
+          else echo "⚠️ No build file found. Analyzing source only."; fi
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master

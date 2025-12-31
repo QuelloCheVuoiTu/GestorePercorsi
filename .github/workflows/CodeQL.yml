@@ -13,7 +13,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  # --- JOB 1: Rilevamento Linguaggi ---
   check-languages:
     runs-on: ubuntu-latest
     outputs:
@@ -21,55 +20,31 @@ jobs:
       has-languages: ${{ steps.set-matrix.outputs.has-languages }}
     steps:
       - uses: actions/checkout@v4
-
       - name: 🕵️ Detect Languages
         id: set-matrix
         shell: python
         run: |
           import os
           import json
-
-          # Mappa estensioni -> Linguaggi CodeQL
           mapping = {
-              '.py': 'python',
-              '.js': 'javascript', '.ts': 'javascript', '.jsx': 'javascript', '.tsx': 'javascript',
-              '.java': 'java',
-              '.go': 'go',
-              '.rb': 'ruby',
-              '.cs': 'csharp',
-              '.cpp': 'cpp', '.c': 'cpp', '.h': 'cpp',
-              '.swift': 'swift'
+              '.py': 'python', '.js': 'javascript', '.ts': 'javascript', '.jsx': 'javascript', '.tsx': 'javascript',
+              '.java': 'java', '.go': 'go', '.rb': 'ruby', '.cs': 'csharp', '.cpp': 'cpp', '.c': 'cpp', '.h': 'cpp', '.swift': 'swift'
           }
-
           found_langs = set()
-
-          # Scansiona il repo (escludendo cartelle nascoste e comuni di build)
           for root, dirs, files in os.walk('.'):
-              # Esclusioni directory
               dirs[:] = [d for d in dirs if d not in ['.git', '.github', 'node_modules', 'dist', 'build', 'venv']]
-
               for file in files:
                   ext = os.path.splitext(file)[1].lower()
                   if ext in mapping:
                       found_langs.add(mapping[ext])
-
           langs_list = list(found_langs)
-
-          # Output per GitHub Actions
           print(f"Found languages: {langs_list}")
-
-          if not langs_list:
-              # Caso raro: nessun codice supportato
-              langs_list = ['none']
-              has_langs = 'false'
-          else:
-              has_langs = 'true'
-
+          has_langs = 'true' if langs_list else 'false'
+          if not langs_list: langs_list = ['none']
           with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
               fh.write(f"languages={json.dumps(langs_list)}\n")
               fh.write(f"has-languages={has_langs}\n")
 
-  # --- JOB 2: Analisi (Dinamica) ---
   analyze:
     needs: check-languages
     if: needs.check-languages.outputs.has-languages == 'true'
@@ -79,25 +54,14 @@ jobs:
       actions: read
       contents: read
       security-events: write
-
     strategy:
       fail-fast: false
       matrix:
-        # La matrice viene popolata dinamicamente dal job precedente!
         language: ${{ fromJson(needs.check-languages.outputs.matrix) }}
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:${{matrix.language}}"
+      - uses: github/codeql-action/init@v3
+        with: { languages: ${{ matrix.language }} }
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3
+        with: { category: "/language:${{matrix.language}}" }
