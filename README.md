@@ -11,7 +11,6 @@ Servizio per la gestione dei percorsi.
 - Indirizzo: `172.31.0.110`
 - Porta: `32079`
 
-
 # API
 ### Add Data To DB
 - `172.31.0.110:32079/routes/addDataToDB`
