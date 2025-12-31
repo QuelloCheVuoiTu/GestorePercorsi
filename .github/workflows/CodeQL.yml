@@ -1,0 +1,47 @@
+name: 🔍 CodeQL Analysis
+on:
+  push:
+    branches: [ "**" ]
+    paths-ignore:
+      - '.github/workflows/**'
+      - 'sonar-project.properties'
+  pull_request:
+    branches: [ "**" ]
+    paths-ignore:
+      - '.github/workflows/**'
+      - 'sonar-project.properties'
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false # Se un linguaggio non esiste nel repo, non bloccare gli altri
+      matrix:
+        # CodeQL tenterà l'analisi su tutti questi. Se il codice non c'è, salta.
+        language: [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby', 'swift' ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        continue-on-error: true
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+        continue-on-error: true
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        continue-on-error: true
+        with:
+          category: "/language:${{matrix.language}}"
