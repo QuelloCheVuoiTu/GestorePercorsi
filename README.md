@@ -4,8 +4,8 @@ Servizio per la gestione dei percorsi.
 ## Indice
 | Sezione                                        | Descrizione                                                               |
 |------------------------------------------------|---------------------------------------------------------------------------|
-| [Informazioni generali](#informazionigenerali) | Fornisce informazioni legate all'indirizzo e alla porta del servizio      |
-| [API](#api)                                    | Fornisce informazioni legate all'API del servizio con i relativi metodi   |
+| [Informazioni generali](#informazionigenerali) | Fornisce informazioni legate all'indirizzo e alla porta del servizio.     |
+| [API](#api)                                    | Fornisce informazioni legate all'API del servizio con i relativi metodi.  |
 
 # Informazioni generali
 - Indirizzo: `172.31.0.110`
